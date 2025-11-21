@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models.transaction import Transaction, TransactionResponse
 from backend.utils.parser import parse_csv
+from backend.utils.detect_recurring import detect_recurring_subscriptions
 from typing import List
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -57,11 +58,49 @@ async def upload_csv(
         
         db.commit()
         
+        # After storing transactions, run subscription detection automatically
+        # Prepare list for detection (transactions for this user)
+        txn_list = [
+            {
+                'date': t.date,
+                'description': t.description,
+                'amount': t.amount
+            }
+            for t in db.query(Transaction).filter(Transaction.user_id == user_id).all()
+        ]
+
+        detected = detect_recurring_subscriptions(txn_list)
+
+        created_count = 0
+        for sub_data in detected:
+            existing = db.query(Subscription).filter(
+                Subscription.user_id == user_id,
+                Subscription.merchant_name == sub_data['merchant_name']
+            ).first()
+
+            if not existing:
+                subscription = Subscription(
+                    merchant_name=sub_data['merchant_name'],
+                    amount=sub_data['amount'],
+                    frequency=sub_data['frequency'],
+                    start_date=sub_data['start_date'],
+                    next_billing_date=sub_data.get('next_billing_date'),
+                    status=sub_data['status'],
+                    user_id=user_id
+                )
+                db.add(subscription)
+                created_count += 1
+
+        db.commit()
+
         return {
             "status": "success",
             "message": f"Successfully uploaded and parsed {stored_count} transactions",
             "transaction_count": stored_count,
-            "filename": file.filename
+            "filename": file.filename,
+            "detected_count": len(detected),
+            "created_count": created_count,
+            "subscriptions": detected
         }
         
     except Exception as e:

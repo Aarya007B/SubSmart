@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, DollarSign, TrendingUp } from 'lucide-react';
+import { Calendar, Currency, TrendingUp } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import type { Subscription } from '@/lib/api';
 
@@ -61,8 +61,8 @@ export default function SubscriptionCard({ subscription, onClick }: Subscription
 
                     <div className="flex flex-col items-end">
                         <div className="flex items-center text-2xl font-bold text-foreground">
-                            <DollarSign className="h-5 w-5 text-primary" />
-                            <span>{subscription.amount.toFixed(2)}</span>
+                            <Currency className="h-5 w-5 text-primary" />
+                            <span>{formatCurrency(subscription.amount)}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
                             per {subscription.frequency.replace('-', ' ')}

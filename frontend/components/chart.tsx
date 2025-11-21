@@ -15,7 +15,7 @@ import {
     Legend,
     ResponsiveContainer,
 } from 'recharts';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export type ChartType = 'line' | 'bar' | 'pie';
 
@@ -49,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                         <span className="font-medium" style={{ color: entry.color }}>
                             {entry.name}:
                         </span>{' '}
-                        {typeof entry.value === 'number' ? `$${entry.value.toFixed(2)}` : entry.value}
+                        {typeof entry.value === 'number' ? formatCurrency(entry.value) : entry.value}
                     </p>
                 ))}
             </div>

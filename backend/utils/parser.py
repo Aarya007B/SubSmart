@@ -96,13 +96,17 @@ def parse_date(date_str: str) -> datetime.date:
 def clean_amount(amount_str: str) -> float:
     """Clean and parse amount string"""
     try:
-        # Remove currency symbols, commas, spaces
-        cleaned = re.sub(r'[£$€,\s]', '', amount_str)
-        
+        # Remove common currency symbols (₹, £, $, €), 3-letter currency codes (INR, USD), commas and spaces
+        cleaned = amount_str
+        # Remove 3-letter currency codes (case-insensitive)
+        cleaned = re.sub(r'\b[A-Za-z]{3}\b', '', cleaned)
+        # Remove currency symbols and commas/spaces
+        cleaned = re.sub(r'[\u20b9£$€,\s]', '', cleaned)
+
         # Handle parentheses for negative amounts
         if '(' in cleaned and ')' in cleaned:
             cleaned = '-' + cleaned.replace('(', '').replace(')', '')
-        
+
         return float(cleaned)
     except:
         return None

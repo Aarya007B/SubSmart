@@ -15,7 +15,7 @@ Your entire SubSmart codebase has been **audited, optimized, and tested** for lo
   - `POST /api/upload` → Uploaded 93 transactions
   - `POST /api/subscriptions/detect` → Found 9 subscriptions
   - `GET /api/subscriptions` → Returns subscription list
-  - `GET /api/insights` → Returns $184.93/month analytics
+  - `GET /api/insights` → Returns ₹184.93/month analytics
   - `GET /docs` → Swagger UI available
 
 ### Frontend (Next.js + React)
@@ -89,23 +89,23 @@ open http://localhost:3000
 ✓ CSV Upload       → 93 transactions parsed in <1 second
 ✓ Detection        → 9 recurring subscriptions identified
 ✓ Dashboard        → Displays all subscriptions with UI polish
-✓ Insights         → Shows $184.93/month spending + trends
+✓ Insights         → Shows ₹184.93/month spending + trends
 ✓ API Calls        → Frontend ↔ Backend communication perfect
 ✓ Page Load        → ~5-6 seconds (cold), <1s (cached)
 ```
 
 ### Sample Detected Subscriptions
-1. Netflix ($15.99/month)
-2. Spotify ($9.99/month)
-3. Adobe Creative Cloud ($54.99/month)
-4. Amazon Prime ($14.99/month)
-5. Microsoft 365 ($6.99/month)
-6. Dropbox ($11.99/month)
-7. NY Times ($17/month)
-8. Gym Membership ($45/month)
-9. Disney+ ($7.99/month)
+1. Netflix (₹15.99/month)
+2. Spotify (₹9.99/month)
+3. Adobe Creative Cloud (₹54.99/month)
+4. Amazon Prime (₹14.99/month)
+5. Microsoft 365 (₹6.99/month)
+6. Dropbox (₹11.99/month)
+7. NY Times (₹17/month)
+8. Gym Membership (₹45/month)
+9. Disney+ (₹7.99/month)
 
-**Total Monthly**: $184.93 | **Yearly**: $2,219.16
+**Total Monthly**: ₹184.93 | **Yearly**: ₹2,219.16
 
 ---
 

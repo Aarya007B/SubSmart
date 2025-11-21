@@ -220,7 +220,7 @@ The `sample-data.csv` includes 93 transactions from Jan-Nov 2024 with:
 - Netflix, Spotify, Adobe Creative Cloud, Amazon Prime
 - Microsoft 365, Dropbox, New York Times, Gym, Disney+
 
-Successfully detected as **9 monthly recurring subscriptions** with estimated **$184.93/month** spend.
+Successfully detected as **9 monthly recurring subscriptions** with estimated **₹184.93/month** spend.
 
 ---
 
