@@ -59,18 +59,28 @@
 
 @layer base {
   * {
-    @apply border-border;
+    /* Use custom property for border color instead of unknown Tailwind utility */
+    border-color: hsl(var(--border));
+    box-sizing: border-box;
   }
   
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg border border-white/20;
+    background-color: rgb(255 255 255 / 0.7);
+    border-color: rgb(255 255 255 / 0.2);
+    border-width: 1px;
+    backdrop-filter: blur(16px);
+  }
+  
+  .dark .glass {
+    background-color: rgb(17 24 39 / 0.7);
   }
   
   .animate-gradient {
