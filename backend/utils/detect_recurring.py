@@ -1,7 +1,14 @@
+import json
+import os
 import re
-from datetime import datetime, timedelta
-from typing import List, Dict
 from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+import google.generativeai as genai
+
+
+_GENAI_CONFIGURED = False
 
 
 def normalize_merchant(description: str) -> str:
@@ -41,6 +48,147 @@ def normalize_merchant(description: str) -> str:
 
 
 def detect_recurring_subscriptions(transactions: List[Dict]) -> List[Dict]:
+    """Detect recurring subscriptions, preferring Gemini-based analysis."""
+    gemini_result = _detect_recurring_with_gemini(transactions)
+
+    if gemini_result is not None:
+        print(f"DEBUG: Gemini-based detector returned {len(gemini_result)} subscriptions")
+        return gemini_result
+
+    print("DEBUG: Falling back to heuristic detector")
+    return _detect_recurring_locally(transactions)
+
+
+def _detect_recurring_with_gemini(transactions: List[Dict]) -> Optional[List[Dict]]:
+    """Use Gemini to analyse transactions. Returns None on failure to fall back."""
+    if not transactions:
+        print("DEBUG: No transactions provided for Gemini detector")
+        return []
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("DEBUG: GEMINI_API_KEY not set; skipping Gemini-based detection")
+        return None
+
+    if not _configure_genai(api_key):
+        return None
+
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        instruction = (
+            "You are a financial data analyst. Given a list of bank transactions "
+            "in JSON, identify recurring subscription payments. Output ONLY a JSON array of objects."
+            "Each object must include: merchant_name (string), amount (number), frequency "
+            "(weekly, bi-weekly, monthly, yearly), start_date (YYYY-MM-DD), next_billing_date "
+            "(YYYY-MM-DD or null), status ('active' or 'cancelled'), and transaction_count (integer)."
+        )
+
+        transactions_snippet = json.dumps(transactions[:100])  # guard against very large payloads
+        response = model.generate_content([
+            instruction,
+            f"Transactions:\n{transactions_snippet}",
+        ])
+
+        response_text = getattr(response, "text", "").strip()
+        if not response_text:
+            print("DEBUG: Empty response from Gemini detector")
+            return None
+
+        json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
+        if not json_match:
+            print(f"DEBUG: Gemini response missing JSON array: {response_text[:200]}")
+            return None
+
+        raw_items = json.loads(json_match.group())
+
+    except Exception as exc:
+        print(f"DEBUG: Gemini detection failed: {exc}")
+        return None
+
+    if not isinstance(raw_items, list):
+        print("DEBUG: Gemini response is not a list; falling back")
+        return None
+
+    sanitized: List[Dict] = []
+
+    for idx, item in enumerate(raw_items):
+        try:
+            merchant = str(item.get("merchant_name") or "").strip()
+            start_date = str(item.get("start_date") or "").strip()
+            amount = float(item.get("amount"))
+            frequency = _normalize_frequency(item.get("frequency"))
+
+            if not merchant or not start_date or amount <= 0 or not frequency:
+                print(f"DEBUG: Gemini item {idx} missing required fields; skipping")
+                continue
+
+            subscription: Dict = {
+                "merchant_name": merchant.title(),
+                "amount": round(amount, 2),
+                "frequency": frequency,
+                "start_date": start_date,
+                "status": _normalize_status(item.get("status")),
+                "transaction_count": int(item.get("transaction_count") or 0),
+            }
+
+            next_billing = item.get("next_billing_date")
+            subscription["next_billing_date"] = str(next_billing).strip() if next_billing else None
+
+            sanitized.append(subscription)
+
+        except Exception as parse_error:
+            print(f"DEBUG: Unable to parse Gemini item {idx}: {parse_error}")
+            continue
+
+    print(f"DEBUG: Gemini sanitized {len(sanitized)} subscriptions")
+    return sanitized
+
+
+def _configure_genai(api_key: str) -> bool:
+    """Configure Gemini client once."""
+    global _GENAI_CONFIGURED
+    if _GENAI_CONFIGURED:
+        return True
+
+    try:
+        genai.configure(api_key=api_key)
+        _GENAI_CONFIGURED = True
+        return True
+    except Exception as exc:
+        print(f"DEBUG: Failed to configure Gemini client: {exc}")
+        return False
+
+
+def _normalize_frequency(value) -> Optional[str]:
+    mapping = {
+        "weekly": "weekly",
+        "week": "weekly",
+        "bi-weekly": "bi-weekly",
+        "biweekly": "bi-weekly",
+        "fortnightly": "bi-weekly",
+        "monthly": "monthly",
+        "month": "monthly",
+        "yearly": "yearly",
+        "annual": "yearly",
+        "annually": "yearly",
+    }
+
+    if value is None:
+        return None
+
+    frequency = str(value).strip().lower()
+    return mapping.get(frequency, "monthly")
+
+
+def _normalize_status(value) -> str:
+    if not value:
+        return "active"
+    status = str(value).strip().lower()
+    return status if status in {"active", "cancelled"} else "active"
+
+
+def _detect_recurring_locally(transactions: List[Dict]) -> List[Dict]:
     """
     Detect recurring subscriptions from transaction list
     

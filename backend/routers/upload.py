@@ -1,7 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from backend.utils.parser import parse_csv
+from backend.utils.parser_new import parse_file
 from backend.utils.detect_recurring import detect_recurring_subscriptions
 import sqlite3
+from pathlib import Path
 
 router = APIRouter()
 
@@ -15,14 +17,19 @@ async def upload_csv(file: UploadFile = File(...), user_id: int = 1):
         
         contents = await file.read()
         print(f"File contents length: {len(contents)}")
-        
-        # Decode bytes to string
-        if isinstance(contents, bytes):
-            contents = contents.decode('utf-8')
-        
-        # Parse CSV
+
+        filename = file.filename or "upload"
+        suffix = Path(filename).suffix.lower()
+
+        # Parse transactions based on file type
         try:
-            transactions = parse_csv(contents)
+            if suffix == ".pdf":
+                print("DEBUG: Detected PDF upload; delegating to Gemini parser")
+                transactions = parse_file(contents, filename)
+            else:
+                if isinstance(contents, bytes):
+                    contents = contents.decode('utf-8')
+                transactions = parse_csv(contents)
         except ValueError as e:
             print(f"Parse error: {e}")
             raise HTTPException(status_code=400, detail=str(e))

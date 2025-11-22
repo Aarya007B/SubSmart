@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import UploadBox from '@/components/upload-box';
-import { uploadCSV, detectSubscriptions } from '@/lib/api';
+import { uploadTransactions, detectSubscriptions } from '@/lib/api';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function UploadPage() {
@@ -17,8 +17,8 @@ export default function UploadPage() {
         try {
             setError('');
 
-            // Step 1: Upload CSV
-            const result = await uploadCSV(file);
+            // Step 1: Upload transactions
+            const result = await uploadTransactions(file);
             setUploadResult(result);
 
             // Step 2: Detect subscriptions
@@ -53,7 +53,7 @@ export default function UploadPage() {
                             Upload Transaction Data
                         </h1>
                         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                            Upload your bank transaction CSV file and we'll automatically detect your recurring subscriptions
+                            Upload your bank statements (PDF or CSV) and we'll automatically detect your recurring subscriptions
                         </p>
                     </div>
 
@@ -61,7 +61,7 @@ export default function UploadPage() {
                     <div className="flex items-center justify-center gap-4 py-8">
                         <StepIndicator
                             number={1}
-                            label="Upload CSV"
+                            label="Upload Statement"
                             isActive={step === 'upload'}
                             isComplete={step !== 'upload'}
                         />

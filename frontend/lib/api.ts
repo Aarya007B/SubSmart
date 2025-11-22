@@ -64,9 +64,9 @@ export interface InsightsData {
 // API Functions
 
 /**
- * Upload CSV file
+ * Upload transaction statement (PDF or CSV)
  */
-export async function uploadCSV(file: File, userId: number = 1): Promise<UploadResponse> {
+export async function uploadTransactions(file: File, userId: number = 1): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 

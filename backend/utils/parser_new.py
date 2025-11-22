@@ -1,102 +1,75 @@
-import csv
-from io import StringIO
+import os
+import json
 import re
+import tempfile
+import google.generativeai as genai
 
-def clean_amount(amount_str):
-    """Clean amount string: strip currency symbols, convert to float."""
-    if amount_str is None:
-        return None
-    
-    # Convert to string
-    amount_str = str(amount_str).strip()
-    
-    if not amount_str:
-        return None
-    
-    # Remove common currency symbols and codes
-    amount_str = re.sub(r'[₹$€£]', '', amount_str)
-    amount_str = re.sub(r'\s*(INR|USD|EUR|GBP)\s*', '', amount_str)
-    amount_str = amount_str.strip()
-    
+
+def parse_file(file_contents, file_name):
+    """Parse CSV/PDF file using Gemini API to extract transactions."""
     try:
-        val = float(amount_str)
-        return val if val > 0 else None
-    except (ValueError, TypeError):
-        return None
+        # Initialize Gemini
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not set in environment")
+        
+        genai.configure(api_key=api_key)
+        
+        # Create temp file
+        with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file_name)[1], delete=False) as tmp:
+            if isinstance(file_contents, bytes):
+                tmp.write(file_contents)
+            else:
+                tmp.write(file_contents.encode())
+            temp_path = tmp.name
+        
+        try:
+            # Upload file to Gemini
+            print(f"DEBUG: Uploading file {file_name} to Gemini")
+            file = genai.upload_file(temp_path)
+            
+            # Create prompt for Gemini
+            prompt = """Extract all transactions from this document. For each transaction, return a JSON array with objects containing:
+- date (YYYY-MM-DD format if possible, otherwise keep original format)
+- description (merchant/payee name, keep it clear and concise)
+- amount (positive number only, no currency symbols)
+
+Return ONLY the JSON array, no other text or explanation.
+Example: [{"date": "2025-11-20", "description": "Amazon", "amount": 49.99}, {"date": "2025-11-21", "description": "Starbucks", "amount": 5.50}]"""
+            
+            # Call Gemini with file
+            print(f"DEBUG: Calling Gemini API to parse transactions")
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content([prompt, file])
+            
+            # Parse response
+            response_text = response.text.strip()
+            print(f"DEBUG: Gemini response: {response_text[:200]}")
+            
+            # Extract JSON from response
+            json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+            if not json_match:
+                raise ValueError("No valid transaction data found in Gemini response")
+            
+            transactions = json.loads(json_match.group())
+            
+            if not transactions:
+                raise ValueError("No valid transactions found")
+            
+            print(f"DEBUG: Parsed {len(transactions)} transactions via Gemini")
+            return transactions
+            
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        
+    except Exception as e:
+        error_msg = f"File parse error: {str(e)}"
+        print(f"DEBUG: {error_msg}")
+        raise ValueError(error_msg)
 
 
 def parse_csv(file_contents):
-    """Parse CSV file and extract transactions."""
-    try:
-        # Decode if bytes
-        if isinstance(file_contents, bytes):
-            text = file_contents.decode("utf-8")
-        else:
-            text = str(file_contents)
-        
-        # Parse CSV
-        lines = text.split('\n')
-        if not lines or not lines[0]:
-            raise ValueError("CSV is empty")
-        
-        reader = csv.DictReader(StringIO(text))
-        
-        if not reader.fieldnames:
-            raise ValueError("No CSV headers found")
-        
-        print(f"DEBUG: CSV Headers: {reader.fieldnames}")
-        
-        transactions = []
-        
-        for idx, row in enumerate(reader):
-            if not row or all(not v for v in row.values()):
-                continue
-            
-            print(f"DEBUG: Row {idx}: {row}")
-            
-            # Find columns
-            date = None
-            description = None
-            amount = None
-            
-            for col_name, col_value in row.items():
-                if not col_name:
-                    continue
-                
-                col_lower = str(col_name).lower().strip()
-                
-                # Skip empty values
-                if col_value is None or str(col_value).strip() == "":
-                    continue
-                
-                col_value_str = str(col_value).strip()
-                
-                # Match column names
-                if "date" in col_lower:
-                    date = col_value_str
-                elif "description" in col_lower or "merchant" in col_lower or "payee" in col_lower:
-                    description = col_value_str
-                elif "amount" in col_lower or "value" in col_lower:
-                    amount = clean_amount(col_value_str)
-            
-            # Only add if all three fields exist
-            if date and description and amount:
-                tx = {
-                    "date": date,
-                    "description": description,
-                    "amount": amount
-                }
-                print(f"DEBUG: Adding transaction: {tx}")
-                transactions.append(tx)
-        
-        print(f"DEBUG: Total transactions parsed: {len(transactions)}")
-        
-        if not transactions:
-            raise ValueError(f"No valid transactions found in CSV")
-        
-        return transactions
-        
-    except Exception as e:
-        error_msg = f"CSV parse error: {str(e)}"
-        print(f"DEBUG: {error_msg}")
-        raise ValueError(error_msg)
+    """Parse CSV file and extract transactions using Gemini API."""
+    return parse_file(file_contents, "file.csv")
