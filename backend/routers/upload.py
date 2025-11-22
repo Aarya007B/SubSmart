@@ -1,137 +1,152 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models.transaction import Transaction, TransactionResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from backend.utils.parser import parse_csv
 from backend.utils.detect_recurring import detect_recurring_subscriptions
-from typing import List
+import sqlite3
 
-router = APIRouter(prefix="/api", tags=["upload"])
+router = APIRouter()
 
-
-@router.post("/upload", response_model=dict)
-async def upload_csv(
-    file: UploadFile = File(...),
-    user_id: int = 1,  # Default user for demo
-    db: Session = Depends(get_db)
-):
-    """
-    Upload and parse CSV file containing bank transactions
-    
-    Args:
-        file: CSV file upload
-        user_id: User ID (default 1 for demo)
-        db: Database session
-        
-    Returns:
-        Dictionary with upload status and transaction count
-    """
-    # Validate file type
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
-    
+@router.post("/api/upload")
+async def upload_csv(file: UploadFile = File(...), user_id: int = 1):
+    """Upload CSV and automatically detect subscriptions."""
     try:
-        # Read file content
-        content = await file.read()
-        file_content = content.decode('utf-8')
+        print(f"\n=== UPLOAD START ===")
+        print(f"Filename: {file.filename}")
+        print(f"User ID: {user_id}, Type: {type(user_id)}")
+        
+        contents = await file.read()
+        print(f"File contents length: {len(contents)}")
+        
+        # Decode bytes to string
+        if isinstance(contents, bytes):
+            contents = contents.decode('utf-8')
         
         # Parse CSV
-        parsed_transactions = parse_csv(file_content)
+        try:
+            transactions = parse_csv(contents)
+        except ValueError as e:
+            print(f"Parse error: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
         
-        if not parsed_transactions:
-            raise HTTPException(
-                status_code=400, 
-                detail="No valid transactions found in CSV"
-            )
+        if not transactions:
+            raise HTTPException(status_code=400, detail="No valid transactions found in CSV")
+        
+        print(f"Parsed {len(transactions)} transactions")
         
         # Store transactions in database
-        stored_count = 0
-        for txn_data in parsed_transactions:
-            transaction = Transaction(
-                date=txn_data['date'],
-                description=txn_data['description'],
-                amount=txn_data['amount'],
-                user_id=user_id
-            )
-            db.add(transaction)
-            stored_count += 1
+        conn = sqlite3.connect("subsmart.db")
+        cur = conn.cursor()
         
-        db.commit()
-        
-        # After storing transactions, run subscription detection automatically
-        # Prepare list for detection (transactions for this user)
-        txn_list = [
-            {
-                'date': t.date,
-                'description': t.description,
-                'amount': t.amount
-            }
-            for t in db.query(Transaction).filter(Transaction.user_id == user_id).all()
-        ]
-
-        detected = detect_recurring_subscriptions(txn_list)
-
-        created_count = 0
-        for sub_data in detected:
-            existing = db.query(Subscription).filter(
-                Subscription.user_id == user_id,
-                Subscription.merchant_name == sub_data['merchant_name']
-            ).first()
-
-            if not existing:
-                subscription = Subscription(
-                    merchant_name=sub_data['merchant_name'],
-                    amount=sub_data['amount'],
-                    frequency=sub_data['frequency'],
-                    start_date=sub_data['start_date'],
-                    next_billing_date=sub_data.get('next_billing_date'),
-                    status=sub_data['status'],
-                    user_id=user_id
+        inserted_count = 0
+        for idx, tx in enumerate(transactions):
+            try:
+                print(f"\nProcessing transaction {idx}:")
+                print(f"  TX object: {tx}, Type: {type(tx)}")
+                
+                # Extract values
+                date_val = tx.get("date")
+                desc_val = tx.get("description")
+                amt_val = tx.get("amount")
+                
+                print(f"  date_val: {date_val}, Type: {type(date_val)}")
+                print(f"  desc_val: {desc_val}, Type: {type(desc_val)}")
+                print(f"  amt_val: {amt_val}, Type: {type(amt_val)}")
+                
+                # Validate and convert
+                if not isinstance(date_val, str):
+                    date_val = str(date_val) if date_val else ""
+                if not isinstance(desc_val, str):
+                    desc_val = str(desc_val) if desc_val else ""
+                if not isinstance(amt_val, float):
+                    if isinstance(amt_val, (int, float)):
+                        amt_val = float(amt_val)
+                    else:
+                        print(f"  Skipping: amount is not numeric")
+                        continue
+                
+                date_val = date_val.strip()
+                desc_val = desc_val.strip()
+                
+                if not date_val or not desc_val or amt_val <= 0:
+                    print(f"  Skipping: missing required fields")
+                    continue
+                
+                print(f"  Final values:")
+                print(f"    user_id: {user_id}, Type: {type(user_id)}")
+                print(f"    date_val: '{date_val}', Type: {type(date_val)}")
+                print(f"    desc_val: '{desc_val}', Type: {type(desc_val)}")
+                print(f"    amt_val: {amt_val}, Type: {type(amt_val)}")
+                
+                # Insert
+                cur.execute(
+                    "INSERT INTO transactions (user_id, date, description, amount) VALUES (?, ?, ?, ?)",
+                    (user_id, date_val, desc_val, amt_val)
                 )
-                db.add(subscription)
+                inserted_count += 1
+                print(f"  ✓ Inserted")
+                
+            except Exception as e:
+                print(f"  ✗ Error: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        conn.commit()
+        print(f"\nInserted {inserted_count} transactions")
+        
+        # Run detection on all transactions for this user
+        try:
+            cur.execute("SELECT date, description, amount FROM transactions WHERE user_id=?", (user_id,))
+            rows = cur.fetchall()
+            transactions_list = [
+                {'date': r[0], 'description': r[1], 'amount': r[2]}
+                for r in rows
+            ]
+            detected = detect_recurring_subscriptions(transactions_list)
+        except Exception as e:
+            print(f"Detection error: {e}")
+            import traceback
+            traceback.print_exc()
+            detected = []
+        
+        detected_count = len(detected)
+        print(f"Detected {detected_count} subscriptions")
+        
+        # Store subscriptions
+        created_count = 0
+        for sub in detected:
+            try:
+                merchant = str(sub.get("merchant_name", "Unknown")).strip()
+                amount = float(sub.get("amount", 0))
+                freq = str(sub.get("frequency", "monthly")).strip()
+                start_date = str(sub.get("start_date", "")).strip()
+                
+                cur.execute(
+                    "INSERT INTO subscriptions (user_id, merchant_name, amount, frequency, start_date, status) VALUES (?, ?, ?, ?, ?, 'active')",
+                    (user_id, merchant, amount, freq, start_date)
+                )
                 created_count += 1
-
-        db.commit()
-
+            except (sqlite3.IntegrityError, ValueError, TypeError) as e:
+                print(f"  Subscription error: {e}")
+                pass
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"Created {created_count} subscriptions")
+        print(f"=== UPLOAD END ===\n")
+        
         return {
             "status": "success",
-            "message": f"Successfully uploaded and parsed {stored_count} transactions",
-            "transaction_count": stored_count,
-            "filename": file.filename,
-            "detected_count": len(detected),
+            "transaction_count": inserted_count,
+            "detected_count": detected_count,
             "created_count": created_count,
-            "subscriptions": detected
+            "message": f"Uploaded {inserted_count} transactions, detected {detected_count} subscriptions, created {created_count} new subscriptions"
         }
-        
+    
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error processing file: {str(e)}"
-        )
-
-
-@router.get("/transactions", response_model=List[TransactionResponse])
-def get_transactions(
-    user_id: int = 1,
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
-    """
-    Get all transactions for a user
-    
-    Args:
-        user_id: User ID
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-        db: Database session
-        
-    Returns:
-        List of transactions
-    """
-    transactions = db.query(Transaction).filter(
-        Transaction.user_id == user_id
-    ).offset(skip).limit(limit).all()
-    
-    return transactions
+        print(f"FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")

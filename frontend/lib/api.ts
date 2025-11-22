@@ -154,4 +154,12 @@ export async function calculateProration(
     return response.data;
 }
 
+/**
+ * Create a new subscription (manual)
+ */
+export async function createSubscription(data: Partial<Subscription>): Promise<Subscription> {
+    const response = await api.post(`/api/subscriptions`, data);
+    return response.data;
+}
+
 export default api;
