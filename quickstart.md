@@ -95,15 +95,15 @@ open http://localhost:3000
 ```
 
 ### Sample Detected Subscriptions
-1. Netflix (₹15.99/month)
-2. Spotify (₹9.99/month)
-3. Adobe Creative Cloud (₹54.99/month)
-4. Amazon Prime (₹14.99/month)
-5. Microsoft 365 (₹6.99/month)
-6. Dropbox (₹11.99/month)
-7. NY Times (₹17/month)
-8. Gym Membership (₹45/month)
-9. Disney+ (₹7.99/month)
+1. Netflix (₹150.99/month)
+2. Spotify (₹90.99/month)
+3. Adobe Creative Cloud (₹540.99/month)
+4. Amazon Prime (₹140.99/month)
+5. Microsoft 365 (₹60.99/month)
+6. Dropbox (₹110.99/month)
+7. NY Times (₹170/month)
+8. Gym Membership (₹450/month)
+9. Disney+ (₹700.99/month)
 
 **Total Monthly**: ₹184.93 | **Yearly**: ₹2,219.16
 

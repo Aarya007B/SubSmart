@@ -93,9 +93,22 @@ Visit: **http://localhost:3000**
 
 ### 3.1: Upload Transactions
 1. Go to **Upload** page (http://localhost:3000/upload)
-2. Drag & drop or select the `sample-data.csv` file from the project root
+2. Drag & drop or select your CSV file from the project root
 3. Click "Upload & Detect"
-4. System will parse 93+ transactions automatically
+4. System will parse transactions and detect subscriptions automatically
+
+**CSV Format Required**: `date,company,description,amount`
+
+Example CSV:
+```
+date,company,description,amount
+2024-01-15,Netflix,Subscription,499
+2024-02-15,Netflix,Subscription,499
+2024-01-10,Spotify,Premium Plan,199
+2024-02-10,Spotify,Premium Plan,199
+```
+
+The parser will automatically detect the `company` column as the merchant name for subscription detection.
 
 ### 3.2: View Dashboard
 1. Navigate to **Dashboard** (http://localhost:3000/dashboard)

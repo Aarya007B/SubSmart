@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
-from backend.routers import upload, subscriptions, insights
+from backend.routers import upload, subscriptions, insights, classify
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(subscriptions.router)
 app.include_router(insights.router)
+app.include_router(classify.router)
 
 
 @app.on_event("startup")

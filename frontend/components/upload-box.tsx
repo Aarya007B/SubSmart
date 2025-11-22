@@ -9,7 +9,7 @@ interface UploadBoxProps {
     accept?: string;
 }
 
-export default function UploadBox({ onUpload, accept = '.csv' }: UploadBoxProps) {
+export default function UploadBox({ onUpload, accept = '.csv,.pdf' }: UploadBoxProps) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -31,19 +31,31 @@ export default function UploadBox({ onUpload, accept = '.csv' }: UploadBoxProps)
         setIsDragOver(false);
 
         const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile && droppedFile.name.endsWith('.csv')) {
-            setFile(droppedFile);
-            setUploadStatus('idle');
-            setErrorMessage('');
+        if (droppedFile) {
+            const lowerName = droppedFile.name.toLowerCase();
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.pdf')) {
+                setFile(droppedFile);
+                setUploadStatus('idle');
+                setErrorMessage('');
+            } else {
+                setUploadStatus('error');
+                setErrorMessage('Please select a PDF or CSV statement.');
+            }
         }
     }, []);
 
     const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
-            setFile(selectedFile);
-            setUploadStatus('idle');
-            setErrorMessage('');
+            const lowerName = selectedFile.name.toLowerCase();
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.pdf')) {
+                setFile(selectedFile);
+                setUploadStatus('idle');
+                setErrorMessage('');
+            } else {
+                setUploadStatus('error');
+                setErrorMessage('Please select a PDF or CSV statement.');
+            }
         }
     }, []);
 
@@ -116,13 +128,13 @@ export default function UploadBox({ onUpload, accept = '.csv' }: UploadBoxProps)
 
                             <div className="text-center space-y-2">
                                 <p className="text-lg font-semibold text-foreground">
-                                    {isDragOver ? 'Drop your CSV file here' : 'Upload your transaction data'}
+                                    {isDragOver ? 'Drop your PDF or CSV statement here' : 'Upload your transaction data'}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                     Drag and drop or <span className="text-primary font-medium">click to browse</span>
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    Accepts CSV files only
+                                    Accepts PDF or CSV files
                                 </p>
                             </div>
                         </label>

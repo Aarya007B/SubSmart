@@ -64,9 +64,9 @@ export interface InsightsData {
 // API Functions
 
 /**
- * Upload CSV file
+ * Upload transaction statement (PDF or CSV)
  */
-export async function uploadCSV(file: File, userId: number = 1): Promise<UploadResponse> {
+export async function uploadTransactions(file: File, userId: number = 1): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -151,6 +151,14 @@ export async function calculateProration(
     const response = await api.post(`/api/subscriptions/${subscriptionId}/prorate`, {
         cancellation_date: cancellationDate,
     });
+    return response.data;
+}
+
+/**
+ * Create a new subscription (manual)
+ */
+export async function createSubscription(data: Partial<Subscription>): Promise<Subscription> {
+    const response = await api.post(`/api/subscriptions`, data);
     return response.data;
 }
 
